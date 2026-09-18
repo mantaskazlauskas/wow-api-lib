@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.vscode/*
+.venv/
+
+# Converter output: regenerated from an export, and several megabytes.
+export/

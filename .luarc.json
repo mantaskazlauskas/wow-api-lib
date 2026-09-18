@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime": {
+    "version": "Lua 5.1"
+  },
+  "diagnostics": {
+    "globals": [
+      "_G",
+
+      "APIDocumentation",
+      "C_AddOns",
+      "CreateFont",
+      "CreateFrame",
+      "DEFAULT_CHAT_FRAME",
+      "Enum",
+      "GameFontDisable",
+      "GameFontDisableSmall",
+      "GameFontHighlight",
+      "GameFontHighlightSmall",
+      "GameFontNormal",
+      "GameFontNormalSmall",
+      "GetBuildInfo",
+      "GetLocale",
+      "hooksecurefunc",
+      "issecurevariable",
+      "ReloadUI",
+      "SlashCmdList",
+      "UIParent",
+      "UISpecialFrames",
+      "WOW_PROJECT_ID",
+
+      "date",
+      "time",
+      "format",
+      "strtrim",
+      "tinsert",
+      "wipe",
+
+      "SLASH_WOWAPILIB1",
+      "SLASH_WOWAPILIB2",
+      "WowApiLibDB"
+    ],
+    "disable": [
+      "inject-field",
+      "undefined-field"
+    ]
+  },
+  "workspace": {
+    "ignoreDir": [
+      ".vscode",
+      ".venv",
+      "tests",
+      "export"
+    ]
+  }
+}

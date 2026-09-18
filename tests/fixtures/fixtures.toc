@@ -1,0 +1,6 @@
+# Stand-ins for Blizzard_APIDocumentationGenerated, in the same shape: each
+# file is one call to APIDocumentation:AddDocumentationTable.
+MapDocumentation.lua
+UnitDocumentation.lua
+SharedConstantsDocumentation.lua
+SimpleFrameAPIDocumentation.lua

@@ -1,0 +1,25 @@
+## Interface: 120100
+## Title: WoW API Lib
+## Notes: Browse, search and export the WoW API from inside the game.
+## Author: Tuubby
+## Version: 0.1.0
+## SavedVariables: WowApiLibDB
+## Category: Development Tools
+
+# Load order is the dependency graph. Namespace first because everything hangs
+# off it. Docs and Runtime are the two data sources and read nothing from each
+# other; Model joins them, Format turns entries into text, and Export and the
+# browser only consume what those produce. Commands last, because every verb
+# it registers calls into a file above it.
+
+Core\Namespace.lua
+Core\Docs.lua
+Core\Runtime.lua
+Core\Model.lua
+Core\Format.lua
+Core\Export.lua
+
+UI\Widgets.lua
+UI\Browser.lua
+
+Core\Commands.lua
