@@ -35,6 +35,7 @@ events:SetScript("OnEvent", function(self, _, name)
 
     WowApiLibDB = type(WowApiLibDB) == "table" and WowApiLibDB or {}
     ns.db = WowApiLibDB
+    ns.SetupLaunchers()
 end)
 
 --------------------------------------------------------------------------------
@@ -46,3 +47,7 @@ end)
 function ns.ShowBrowser(_) end
 function ns.ToggleBrowser() end
 function ns.RefreshBrowser() end
+
+-- UI/Launchers.lua
+function ns.SetupLaunchers() end
+function ns.ToggleMinimapButton() end

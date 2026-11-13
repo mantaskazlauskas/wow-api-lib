@@ -15,6 +15,7 @@ local HELP = {
     "/wal clear               drop the export from saved variables",
     "/wal rescan              rescan the runtime (after other addons load more UI)",
     "/wal stats               counts",
+    "/wal minimap             hide or show the minimap button",
 }
 
 local verbs = {}
@@ -44,6 +45,8 @@ verbs.stats = function()
     end
     ns.Print(ns.HasExport() and "an export is waiting in saved variables." or "no export in saved variables.")
 end
+
+verbs.minimap = function() ns.ToggleMinimapButton() end
 
 verbs.help = function()
     for _, line in ipairs(HELP) do ns.Print(line) end

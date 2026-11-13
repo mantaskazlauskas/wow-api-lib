@@ -11,10 +11,12 @@
 --             "preloaded"  /api was typed first, so the docs are already in
 --             "noapi"      the documentation addon refuses to load
 --
--- Globals for suites: ok, eq, section, FAILED, NS, CHAT, Slash, DB.
+-- Globals for suites: ok, eq, section, FAILED, NS, CHAT, Slash, DB, ADDON_DIR,
+-- COMPARTMENT.
 --------------------------------------------------------------------------------
 
 local ADDON, FIXTURES, UI_ROOT = ...
+ADDON_DIR = ADDON
 REAL = UI_ROOT ~= nil
 
 FAILED = 0
@@ -135,6 +137,11 @@ end
 function CreateFont(name) return NewObject("Font", nil, name) end
 
 UIParent = NewObject("Frame")
+GameTooltip = NewObject("GameTooltip")
+Minimap = NewObject("Frame", UIParent, "Minimap")
+-- Keeps what the addon registers, as COMPARTMENT, for the suites.
+COMPARTMENT = {}
+AddonCompartmentFrame = { RegisterAddon = function(_, data) COMPARTMENT[#COMPARTMENT + 1] = data end }
 UISpecialFrames = {}
 SlashCmdList = {}
 WOW_PROJECT_ID = 1

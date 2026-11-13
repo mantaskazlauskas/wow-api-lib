@@ -28,6 +28,12 @@ system is `SecureOnly` or belongs to another game flavour.
 | `/wal clear` | drop the export from saved variables |
 | `/wal rescan` | rescan the runtime, e.g. after other addons load more UI |
 | `/wal stats` | counts |
+| `/wal minimap` | hide or show the minimap button |
+
+The browser also has a minimap button (left-drag moves it around the rim) and
+an entry in the addon compartment, the grouped addons button by the minimap.
+Click either to open or close it. UIs that collect minimap buttons into a grid,
+such as EllesmereUI, pick the minimap button up there.
 
 In the browser, click a group to see it listed in full, or an entry to see its
 signature, types, documentation and flags. The detail pane is an edit box:

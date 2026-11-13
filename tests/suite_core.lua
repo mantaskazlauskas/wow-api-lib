@@ -49,6 +49,46 @@ ok(WowApiLibBrowser and WowApiLibBrowser:IsShown(), "/wal shows the browser")
 print(string.format("        model built in %.2fs", built))
 ok(#Model.Groups() > 0, "there are groups to browse")
 
+eq(#COMPARTMENT, 1, "registered once in the addon compartment")
+-- The .toc lines would list us a second time on Retail.
+local tocFile = io.open(ADDON_DIR .. "/WowApiLib.toc")
+local toc = tocFile and tocFile:read("*a") or ""
+if tocFile then tocFile:close() end
+ok(not toc:find("AddonCompartmentFunc", 1, true), "the .toc does not register it as well")
+local entry = COMPARTMENT[1]
+if entry then
+    -- Single backslashes would be eaten by Lua and leave a missing texture.
+    eq(entry.icon, "Interface\\Icons\\INV_Misc_Book_09", "the compartment icon path")
+    entry.funcOnEnter(UIParent)
+    ok(GameTooltip:IsShown(), "hovering the compartment entry shows a tooltip")
+    entry.funcOnLeave()
+    ok(not GameTooltip:IsShown(), "and leaving hides it")
+    entry.funcOnEnter(nil)
+    ok(GameTooltip:IsShown(), "a missing owner still shows the tooltip")
+    entry.funcOnLeave()
+    entry.func(nil, { buttonName = "LeftButton" })
+    ok(not WowApiLibBrowser:IsShown(), "the compartment entry closes the browser")
+    entry.func(nil, { buttonName = "LeftButton" })
+    ok(WowApiLibBrowser:IsShown(), "and opens it again")
+end
+
+-- Button collectors (EllesmereUI's minimap grid and others) take named Buttons
+-- parented to Minimap, at least 20 wide, whose names don't end in a digit.
+local mini = WowApiLibMinimapButton
+if ok(mini ~= nil, "there is a minimap button") then
+    ok(mini._type == "Button" and mini:GetParent() == Minimap, "parented to the minimap, as collectors expect")
+    ok(mini:GetWidth() >= 20 and not ("WowApiLibMinimapButton"):match("%d$"), "sized and named so collectors pick it up")
+    ok(mini:IsShown(), "shown by default")
+    mini._scripts.OnClick(mini, "LeftButton")
+    ok(not WowApiLibBrowser:IsShown(), "clicking it closes the browser")
+    mini._scripts.OnClick(mini, "LeftButton")
+    ok(WowApiLibBrowser:IsShown(), "and opens it again")
+    Slash("minimap")
+    ok(not mini:IsShown() and DB.minimapHidden == true, "/wal minimap hides it and remembers")
+    Slash("minimap")
+    ok(mini:IsShown() and DB.minimapHidden == nil, "and shows it again")
+end
+
 --------------------------------------------------------------------------------
 if SCENARIO == "noapi" then
     section("without the documentation addon")

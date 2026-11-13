@@ -5,6 +5,7 @@
 ## Version: 0.1.0
 ## SavedVariables: WowApiLibDB
 ## Category: Development Tools
+## IconTexture: Interface\Icons\INV_Misc_Book_09
 
 # Load order is the dependency graph. Namespace first because everything hangs
 # off it. Docs and Runtime are the two data sources and read nothing from each
@@ -21,5 +22,6 @@ Core\Export.lua
 
 UI\Widgets.lua
 UI\Browser.lua
+UI\Launchers.lua
 
 Core\Commands.lua
