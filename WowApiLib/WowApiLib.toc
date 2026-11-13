@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120107, 120105, 50504, 40402, 30405, 20506, 16001, 11509
 ## Title: WoW API Lib
 ## Notes: Browse, search and export the WoW API from inside the game.
 ## Author: Tuubby
