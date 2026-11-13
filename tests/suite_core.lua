@@ -130,6 +130,8 @@ if not REAL then
 
     local enums = FindGroup("Enum")
     ok(FindEntry(enums, "Enum.UndocumentedE") and not FindEntry(enums, "Enum.UIMapType"), "only undocumented enums are listed")
+    ok(not FindEntry(enums, "Enum.UIMapTypeMeta"), "an enum's Meta companion is not listed")
+    ok(FindEntry(enums, "Enum.UndocumentedEMeta"), "a ...Meta name with other values is still listed")
     local cdm = FindEntry(enums, "Enum.CDMLayoutMode")
     ok(cdm and cdm.doc.Fields[1].Name == "AccessOnly", "boolean enum values sort, false first")
     Has(cdm and Format.Entry(cdm), "AllowCreate = true", "boolean enum values format")

@@ -220,6 +220,21 @@ local function ValueLess(a, b)
     return tostring(a) < tostring(b)
 end
 
+-- Enum.FooMeta is the client's companion to Enum.Foo -- NumValues, MinValue
+-- and MaxValue, which the documentation already has on Foo. Nearly every enum
+-- has one, and listed as undocumented they outnumber the real finds ten to one.
+local META_KEYS = { NumValues = true, MinValue = true, MaxValue = true }
+local function IsMetaEnum(name, enums)
+    local base = name:match("^(.+)Meta$")
+    if not base or not enums[base] then return false end
+    local any = false
+    for k in pairs(enums[name]) do
+        if not META_KEYS[k] then return false end
+        any = true
+    end
+    return any
+end
+
 local function BuildRuntime(rt, docGlobals, docNamespaces, docEnums)
     local names = {}
     for name in pairs(rt.namespaces) do
@@ -243,7 +258,7 @@ local function BuildRuntime(rt, docGlobals, docNamespaces, docEnums)
 
     local enumNames = {}
     for name in pairs(rt.enums) do
-        if not docEnums[name] then enumNames[#enumNames + 1] = name end
+        if not docEnums[name] and not IsMetaEnum(name, rt.enums) then enumNames[#enumNames + 1] = name end
     end
     sort(enumNames)
     if #enumNames > 0 then

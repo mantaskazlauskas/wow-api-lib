@@ -5,3 +5,7 @@ __pycache__/
 
 # Converter output: regenerated from an export, and several megabytes.
 export/
+
+# A copied export and what it converts to, kept at the root for reading.
+/WowApiLib.lua
+/WowApiLib.md

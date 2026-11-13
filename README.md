@@ -45,11 +45,19 @@ Addons can't write files, only saved variables. So:
 2. Here: `python tools/convert.py`. It finds the newest export under
    `WOW_ROOT` (read from `deploy.py`) and writes
    `export/<version>.<build>-<client>/`, e.g. `export/12.0.1.64914-retail/`:
+   - `WowApiLib.md`: everything in one readable file. Type names link to their
+     definitions, and restriction flags link to a glossary that explains each one
    - `api.json`: everything, as exported
    - `index.md`: the client (version, build, interface, project, install
      folder, PTR/test/beta flags), systems, counts, and docs-vs-client differences
    - `systems/<Name>.md`: one page per system, with signatures and argument tables
    - `shared-types.md`, `runtime.md`, `globals.txt`
+   For just the single file, from any copy of the export:
+   `python tools/convert.py path/to/WowApiLib.lua --md WowApiLib.md`
+   The single file is too big for VS Code's Markdown preview. For the same
+   content split into topic pages (units, combat, items, housing, widgets...)
+   with a `README.md` front page, in `wow-api-docs/<version>.<build>-<client>/`:
+   `python tools/convert.py path/to/WowApiLib.lua --docs`
 3. In game: `/wal clear`, then `/reload`, so the saved variables file stops
    being loaded at every login.
 

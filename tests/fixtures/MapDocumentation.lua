@@ -31,6 +31,7 @@ local Map =
 			Name = "GoneInThisClient",
 			Type = "Function",
 			MayReturnNothing = true,
+			RequiresValidMap = true,
 			AddsForbiddenAspects = { { Argument = "self", Aspect = 3 } },
 
 			Arguments =
@@ -76,6 +77,7 @@ local Map =
 			Fields =
 			{
 				{ Name = "mapID", Type = "number", Nilable = false },
+				{ Name = "mapType", Type = "UIMapType", Nilable = false },
 				{ Name = "name", Type = "cstring", Nilable = false, Documentation = { "Localized \"name\"|with a pipe" } },
 				{ Name = "position", Type = "vector2", Mixin = "Vector2DMixin", Nilable = false },
 			},

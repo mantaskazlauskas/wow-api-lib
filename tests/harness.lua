@@ -194,6 +194,9 @@ else
     SomeAddonGlobal = noop
     Enum = {
         UIMapType     = { Cosmic = 0, World = 1, Continent = 2 },
+        UIMapTypeMeta = { NumValues = 3, MinValue = 0, MaxValue = 2 },
+        -- Named like UndocumentedE's companion, but holding a real value too.
+        UndocumentedEMeta = { NumValues = 2, Extra = 2 },
         UndocumentedE = { A = 1, B = 2 },
         -- As the live client has it: Enum.CDMLayoutMode holds booleans.
         CDMLayoutMode = { AccessOnly = false, AllowCreate = true },

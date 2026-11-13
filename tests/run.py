@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import sys
 import tempfile
 
@@ -84,6 +85,27 @@ def run_converter(lua, scenario, real):
         n_lua = int(lua.eval("#NS.Docs.Files()"))
         failed += check(len(api["docs"]["files"]) == n_lua, "every documentation file round-trips (%d)" % n_lua)
 
+        single = (out / "WowApiLib.md").read_text(encoding="utf-8")
+        ids = set(re.findall(r'<a id="([^"]+)"></a>', single))
+        broken = sorted({l for l in re.findall(r"\]\(#([^)]+)\)", single) if l not in ids})
+        failed += check(not broken, "WowApiLib.md: every link has an anchor" + (" (broken: %s)" % broken[:5] if broken else ""))
+        failed += check("local uiMapID = C_Map.GetBestMapForUnit(unitToken)" in single, "WowApiLib.md has signatures")
+
+        convert.main([str(sv), "--docs", str(pathlib.Path(tmp) / "docs")])
+        split = pathlib.Path(tmp) / "docs" / "12.0.1.99999-ptr"
+        pages = {p.name: p.read_text(encoding="utf-8") for p in split.glob("*.md")}
+        failed += check("README.md" in pages and len(pages) > 3, "wow-api-docs: front page and %d pages" % len(pages))
+        page_ids = {n: set(re.findall(r'<a id="([^"]+)"></a>', t)) for n, t in pages.items()}
+        broken = sorted({"%s -> %s#%s" % (n, f, a) for n, t in pages.items()
+                         for f, a in re.findall(r"\]\(([\w.-]*\.md)?#([^)\s]+)\)", t)
+                         if a not in page_ids.get(f or n, ())})
+        failed += check(not broken, "wow-api-docs: every link has an anchor" + (" (broken: %s)" % broken[:5] if broken else ""))
+        failed += check("[C_Map](world.md#s-mapui)" in pages["README.md"], "wow-api-docs: front page links systems")
+        failed += check("local uiMapID = C_Map.GetBestMapForUnit(unitToken)" in pages.get("world.md", ""),
+                        "wow-api-docs: systems on their topic page")
+        failed += check(sum(t.count("\n") for n, t in pages.items() if n != "README.md") >= single.count("\n") * 0.9,
+                        "wow-api-docs: the pages hold what WowApiLib.md does")
+
         if real:
             md = (out / "systems" / "MapUI.md").read_text(encoding="utf-8")
             failed += check("local uiMapID = C_Map.GetBestMapForUnit(unitToken)" in md, "real MapUI page")
@@ -99,11 +121,25 @@ def run_converter(lua, scenario, real):
         failed += check("Localized \"name\"\\|with a pipe" in md, "pipes escaped in Markdown tables")
         failed += check("`SecretArguments = AllowedWhenUntainted`" in md, "flags in Markdown")
 
+        failed += check(('<a id="p-secretwhensharedthing"></a>**SecretWhenSharedThing** (Secret): Guarded APIs'
+                         in single) == (scenario == "fresh"),
+                        "WowApiLib.md: shared-file predicates in the glossary when captured")
+        failed += check(any(l.startswith("Flags:") and "[RequiresValidMap](#p-requiresvalidmap)" in l
+                            for l in single.splitlines()),
+                        "WowApiLib.md: a restriction flag links to the glossary")
+        failed += check("`uiMapID`?: number" in single, "WowApiLib.md: nilable fields marked")
+        failed += check("- `mapType`: [UIMapType](#t-enum-uimaptype)" in single,
+                        "WowApiLib.md: type names link to their definitions")
+        failed += check("- `position`: vector2 (Vector2DMixin)" in single, "WowApiLib.md: built-in types stay plain")
+        failed += check("[RequiresValidMap](#p-requiresvalidmap)" in single, "WowApiLib.md: system predicates listed")
+        failed += check("`Enum.UIMapTypeMeta`" not in single, "WowApiLib.md: no Meta companion enums")
+
         rt = (out / "runtime.md").read_text(encoding="utf-8")
         failed += check("`C_Map.GoneInThisClient`" in rt, "missing function reported")
         failed += check("`C_Map.SecretNewThing`" in rt, "undocumented function reported")
         failed += check("### C_Hidden" in rt, "undocumented namespace reported")
         failed += check("### Enum.UndocumentedE" in rt, "undocumented enum reported")
+        failed += check("### Enum.UIMapTypeMeta" not in rt, "Meta companion enums are not reported")
         failed += check("SomeBlizzardGlobal" in (out / "globals.txt").read_text(encoding="utf-8"), "globals.txt")
     return failed
 
