@@ -112,3 +112,23 @@ converter.
 
 `deploy.py` is shared verbatim with the other addon repos. It finds the addon
 folder by its matching `.toc`, so it needs no edits.
+
+### Releasing
+
+Bump `## Version:` in `WowApiLib/WowApiLib.toc`, commit it and get it onto
+`main` on GitHub (push, or merge its pull request and `git pull`). Then, from the
+repo root with nothing uncommitted:
+
+```
+python release.py                   # dry run: prints the tag and release it would create
+python release.py --create          # tag v<version>, push it, create the GitHub release
+python release.py --create --type beta    # v<version>-beta, marked as a pre-release
+```
+
+Publishing the release starts the GitHub Actions workflow in
+`.github/workflows/release.yml`, which zips the `WowApiLib/` folder alone (no
+tests, tools or docs) and attaches it to the release as
+`WowApiLib-v<version>.zip`. The tag goes on whatever commit is checked out, and
+the version comes from the `.toc` on disk, which is why the bump has to be
+committed and on `main` first. `release.py` is shared verbatim with the other
+addon repos, like `deploy.py`.
