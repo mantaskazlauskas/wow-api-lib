@@ -84,6 +84,8 @@ local function DocTypes(f)
     for _, g in ipairs(ns.Model.Groups()) do
         local doc = g.doc
         local t = doc and doc.Type == "ScriptObject" and doc.Name and doc.Name:match("^Simple(.+)API$")
+        -- SimpleCheckboxAPI documents CheckButton, SimpleAnimAPI Animation...
+        if t then t = ns.Annotate.WidgetClass(t) end
         if t and Call(f, "IsObjectType", t) == true then
             out[#out + 1] = t
             groups[#groups + 1] = g

@@ -335,11 +335,17 @@ function ui.Panel(parent, title)
     function p:SetTitle(text) self.titleText:SetText(text and text:upper() or "") end
     function p:SetInfo(text) self.info:SetText(text or "") end
 
-    -- A small button at the right of the header; the info text moves left of it.
+    -- A small button at the right of the header. Each further one goes left
+    -- of the last, and the info text moves left of them all.
     function p:AddHeaderButton(text, width, onClick)
         local b = ui.Button(self, text, width, onClick)
         b:SetHeight(16)
-        b:SetPoint("RIGHT", head, "RIGHT", -4, 0)
+        if self.lastHeaderButton then
+            b:SetPoint("RIGHT", self.lastHeaderButton, "LEFT", -4, 0)
+        else
+            b:SetPoint("RIGHT", head, "RIGHT", -4, 0)
+        end
+        self.lastHeaderButton = b
         self.info:ClearAllPoints()
         self.info:SetPoint("RIGHT", b, "LEFT", -8, 0)
         return b

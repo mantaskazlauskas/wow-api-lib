@@ -39,7 +39,7 @@ local HISTORY_MAX = 100
 
 local frame
 local groupList, entryList, detail, searchBox
-local kindChips, flagChips, backButton, forwardButton, favButton
+local kindChips, flagChips, backButton, forwardButton, favButton, formatButton
 local search                 -- Model.Search result, or nil
 local filters = { kind = "all", flag = "any" }
 local selectedGroup, selectedEntry
@@ -160,21 +160,29 @@ local function DetailLinks()
     return links
 end
 
+-- The detail pane shows either readable text or Lua annotations (LuaLS),
+-- remembered across sessions.
+local function AsLua() return ns.db and ns.db.detailFormat == "lua" end
+
 local function ShowDetail()
     local e = selectedEntry
+    local lua = AsLua()
+    local EntryText = lua and ns.Annotate.Entry or Format.Entry
+    local GroupText = lua and ns.Annotate.Group or Format.Group
     if e and e.kind == "frame" then
         detail:SetContent(Format.Frame(e.info))
     elseif e then
-        detail:SetContent(Format.Entry(e))
+        detail:SetContent(EntryText(e))
     elseif selectedGroup == ALL then
         detail:SetContent(SearchSummary() .. ". Pick one on the left, or a group to narrow them.")
     elseif selectedGroup == FAV then
-        detail:SetContent(Format.Group(FAV, EntryItems()))
+        detail:SetContent(GroupText(FAV, EntryItems()))
     elseif selectedGroup then
-        detail:SetContent(Format.Group(selectedGroup, search and EntryItems() or nil))
+        detail:SetContent(GroupText(selectedGroup, search and EntryItems() or nil))
     else
         detail:SetContent("")
     end
+    formatButton:SetText(lua and "As text" or "As Lua")
     detail:SetLinks(DetailLinks())
 
     local canFav = e and e.kind ~= "frame"
@@ -420,6 +428,12 @@ function GoToEntry(e)
     Push()
 end
 
+local function ToggleFormat()
+    if not ns.db then return end
+    ns.db.detailFormat = not AsLua() and "lua" or nil
+    ShowDetail()
+end
+
 local function ToggleFavorite()
     local e = selectedEntry
     if not e or e.kind == "frame" or not ns.db then return end
@@ -515,6 +529,7 @@ local function Build()
     detail:SetPoint("TOPLEFT", entryList, "TOPRIGHT", GAP, 0)
     detail:SetPoint("BOTTOMRIGHT", -12, BOTTOM)
     detail:SetEmptyText("Pick a group to list it in full, or an entry to see its signature, types and flags.")
+    formatButton = detail:AddHeaderButton("As Lua", 64, ToggleFormat)
     favButton = detail:AddHeaderButton("Favorite", 80, ToggleFavorite)
     favButton:Hide()
 

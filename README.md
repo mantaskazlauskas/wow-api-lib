@@ -52,6 +52,11 @@ signature, types, documentation and flags. The detail pane is an edit box:
   uses. **<** and **>** (or the mouse's back and forward buttons) walk back
   through what you looked at.
 - **Favorite** on an entry adds it to a Favorites group at the top of the list.
+- **As Lua** switches the detail pane to Lua annotations (the LuaLS format VS
+  Code's Lua extension reads): `---@param`/`---@return` with Lua types, classes
+  for structures, `---@enum` for enums, restrictions as comments. Paste one into
+  a definitions file for completion, or into a chat as the exact signature. It
+  works for a whole group too, and the choice is remembered.
 - **Inspect** (or `/wal inspect`) works like `/fstack`: hover a frame to see
   what it is, press Shift to open it, Escape to stop. The browser shows its
   size, anchors, parents and the scripts it has set, lists its widget type's

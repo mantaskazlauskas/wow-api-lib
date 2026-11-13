@@ -9,15 +9,16 @@
 
 # Load order is the dependency graph. Namespace first because everything hangs
 # off it. Docs and Runtime are the two data sources and read nothing from each
-# other; Model joins them, Format turns entries into text, and Export and the
-# browser only consume what those produce. Commands last, because every verb
-# it registers calls into a file above it.
+# other; Model joins them, Format and Annotate turn entries into text and Lua
+# annotations, and Export and the browser only consume what those produce.
+# Commands last, because every verb it registers calls into a file above it.
 
 Core\Namespace.lua
 Core\Docs.lua
 Core\Runtime.lua
 Core\Model.lua
 Core\Format.lua
+Core\Annotate.lua
 Core\Export.lua
 
 UI\Widgets.lua

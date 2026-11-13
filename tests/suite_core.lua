@@ -339,6 +339,66 @@ if not REAL then
 end
 
 --------------------------------------------------------------------------------
+section("Lua annotations")
+--------------------------------------------------------------------------------
+
+local Annotate = NS.Annotate
+-- Every entry's annotation must be valid Lua, so it can be pasted anywhere.
+local bad, checked = {}, 0
+for _, e in ipairs(Model.Entries()) do
+    local text = Annotate.Entry(e)
+    local fn, err = loadstring(text, e.full)
+    if not fn then bad[#bad + 1] = e.full .. ": " .. tostring(err) end
+    checked = checked + 1
+end
+ok(#bad == 0, string.format("every annotation compiles (%d entries)%s", checked,
+                            #bad > 0 and ("; first failure " .. bad[1]) or ""))
+ok(loadstring(Annotate.Group(Model.Groups()[1])) ~= nil, "a group's annotations compile")
+
+-- Made-up entries for what the real data might one day hold.
+local odd = Annotate.Entry({ kind = "function", full = "C_Odd.Thing", doc = {
+    Arguments = { { Name = "a", Type = "string", Default = "x\ny", Odd = "p\nq" } },
+    Returns = {}, Weird = "a\nb" } })
+ok(loadstring(odd) ~= nil, "newlines in defaults and flags stay inside the comment")
+local inf = Annotate.Entry({ kind = "constants", full = "Constants.Odd", doc = {
+    Values = { { Name = "BIG", Value = math.huge, Type = "number" }, { Name = "TENTH", Value = 0.1, Type = "number" } } } })
+local fn = loadstring("Constants = {}; " .. inf .. "; return Constants.Odd")
+local t = fn and fn()
+ok(t and t.BIG == math.huge and t.TENTH == 0.1, "infinite and fractional constants survive as values")
+eq(Annotate.WidgetClass("Anim"), "Animation", "SimpleAnimAPI documents Animation")
+eq(Annotate.WidgetClass("Checkbox"), "CheckButton", "SimpleCheckboxAPI documents CheckButton")
+eq(Annotate.Type("SimpleAnimGroup"), "AnimationGroup", "a script-object type maps to its widget class")
+
+if not REAL then
+    local map, unit = FindGroup("C_Map"), FindGroup("Unit")
+    local text = Annotate.Entry(FindEntry(map, "C_Map.GetBestMapForUnit"))
+    Has(text, "---@param unitToken string", "Blizzard types map to Lua types")
+    Has(text, "---@return number? uiMapID", "nilable return")
+    Has(text, "function C_Map.GetBestMapForUnit(unitToken) end", "a declaration to paste")
+    Has(text, "--- Restrictions: SecretArguments: AllowedWhenUntainted", "restrictions as a comment")
+    text = Annotate.Entry(FindEntry(map, "C_Map.GoneInThisClient"))
+    Has(text, "---@param mapIDs number[]", "a list type")
+    Has(text, "---@param scale? number", "a defaulted argument is optional")
+    Has(text, "--- Missing:", "missing noted")
+    text = Annotate.Entry(FindEntry(map, "UiMapDetails"))
+    Has(text, "---@class UiMapDetails", "a structure becomes a class")
+    Has(text, "---@field mapType Enum.UIMapType", "a documented enum type keeps its name")
+    Has(text, "---@field position Vector2DMixin", "a mixin type")
+    text = Annotate.Entry(FindEntry(map, "Enum.UIMapType"))
+    Has(text, "---@enum Enum.UIMapType", "an enum")
+    Has(text, "Continent = 2,", "with its values")
+    Has(Annotate.Entry(FindEntry(map, "MAP_EXPLORATION_UPDATED")), "---@param uiMapID number (ConditionalSecret)",
+        "an event's payload, with field flags")
+    Has(Annotate.Entry(FindEntry(unit, "UnitCallback")), "---@alias UnitCallback fun(unit: string)", "a callback")
+    Has(Annotate.Entry(FindEntry(FindGroup("C_Hidden"), "C_Hidden.Foo")), "function C_Hidden.Foo(...) end",
+        "an undocumented function by name")
+    Has(Annotate.Entry(FindEntry(FindGroup("Shared types"), "Constants.AuctionConstants")),
+        "DEFAULT_AUCTION_PRICE_MULTIPLIER = 1.5,", "constants")
+    local frameApi = FindGroup("SimpleFrameAPI")
+    Has(frameApi and Annotate.Entry(frameApi.entries[1]), "function Frame:", "script-object methods go on the widget class")
+end
+
+--------------------------------------------------------------------------------
 section("browsing: links, history, favorites, filters")
 --------------------------------------------------------------------------------
 
@@ -408,6 +468,16 @@ if not REAL then
     end
     ok(n > 0 and onlyEvents, "the Events filter lists only events")
     Click(ButtonText("All"))
+
+    Slash("search GetBestMapForUnit")
+    for _, row in ipairs(Rows()) do
+        if row.item.full == "C_Map.GetBestMapForUnit" then row._scripts.OnClick(row) end
+    end
+    ok(Click(ButtonText("As Lua")), "the detail pane can switch to Lua")
+    Has(DetailText(), "---@param unitToken string", "it shows the annotation")
+    eq(DB.detailFormat, "lua", "the choice is saved")
+    ok(Click(ButtonText("As text")), "and switch back")
+    Has(DetailText(), "System MapUI, namespace C_Map", "to the readable text")
 end
 
 --------------------------------------------------------------------------------
