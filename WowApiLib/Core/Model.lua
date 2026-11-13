@@ -31,6 +31,7 @@ ns.Model = Model
 
 local groups, entries, stats
 local docsError
+local typeIndex, keyIndex, predicateNames
 
 -- Short tags, as the entry list shows them.
 Model.KIND_TAGS = {
@@ -291,6 +292,8 @@ end
 
 local function ByLabel(a, b) return a.search < b.search end
 
+local TYPE_KINDS = { enum = true, struct = true, constants = true, callback = true, table = true }
+
 function Model.Build()
     if groups then return end
     groups, entries = {}, {}
@@ -324,13 +327,123 @@ function Model.Build()
         if e.flag then stats.flags[e.flag] = (stats.flags[e.flag] or 0) + 1 end
     end
     for _, g in ipairs(groups) do SortEntries(g) end
+
+    typeIndex, keyIndex, predicateNames = {}, {}, {}
+    for _, e in ipairs(entries) do
+        local key = Model.EntryKey(e)
+        if not keyIndex[key] then keyIndex[key] = e end
+        if e.kind == "predicate" then predicateNames[e.name] = true end
+        if TYPE_KINDS[e.kind] then
+            -- Documented definitions are added before runtime ones, so they win.
+            if not typeIndex[e.name] then typeIndex[e.name] = e end
+            if not typeIndex[e.full] then typeIndex[e.full] = e end
+        end
+    end
 end
 
 -- Forgets the model; the next Build rescans the runtime and re-reads the docs
 -- (the docs themselves are only ever loaded once).
 function Model.Reset()
     groups, entries, stats = nil, nil, nil
+    typeIndex, keyIndex, predicateNames = nil, nil, nil
     ns.Runtime.Scan(true)
+end
+
+--------------------------------------------------------------------------------
+-- Lookups
+--------------------------------------------------------------------------------
+
+-- A stable name for an entry across sessions, for favourites.
+function Model.EntryKey(e) return e.kind .. "|" .. e.full end
+
+function Model.FindByKey(key)
+    Model.Build()
+    return keyIndex[key]
+end
+
+function Model.FindGroup(key)
+    for _, g in ipairs(Model.Groups()) do
+        if g.key == key then return g end
+    end
+end
+
+-- The entry defining a type name as fields use it ("UIMapType", "AuraData"),
+-- or by its full path ("Enum.UIMapType").
+function Model.TypeEntry(name)
+    Model.Build()
+    return name and typeIndex[name] or nil
+end
+
+-- Calls fn(field) for every argument, return, payload value and field.
+local FIELD_LISTS = { "Arguments", "Returns", "Payload", "Fields", "Values" }
+local function EachField(d, fn)
+    if type(d) ~= "table" then return end
+    for _, key in ipairs(FIELD_LISTS) do
+        local list = d[key]
+        if type(list) == "table" then
+            for _, f in ipairs(list) do
+                if type(f) == "table" then fn(f) end
+            end
+        end
+    end
+end
+
+-- Entries for the types an entry refers to, in the order they first appear.
+-- An enumeration's values carry its own name as their type, so it is skipped.
+function Model.RelatedTypes(e)
+    local out, seen = {}, { [e] = true }
+    EachField(e.doc, function(f)
+        for _, name in ipairs({ f.Type or false, f.InnerType or false, f.KeyType or false }) do
+            local t = name and Model.TypeEntry(name)
+            if t and not seen[t] then
+                seen[t] = true
+                out[#out + 1] = t
+            end
+        end
+    end)
+    return out
+end
+
+-- Restriction flags, as the converter's glossary defines them: a declared
+-- predicate (RequiresValidMap, HasRestrictions...) or a Secret* flag.
+function Model.IsRestrictionKey(k)
+    return type(k) == "string" and ((predicateNames and predicateNames[k]) or k:find("Secret", 1, true) ~= nil)
+end
+
+local function HasRestriction(d)
+    for k in pairs(d) do
+        if Model.IsRestrictionKey(k) then return true end
+    end
+    return false
+end
+
+function Model.IsRestricted(e)
+    if e.restricted == nil then
+        local d = e.doc
+        local r = false
+        if type(d) == "table" and e.kind ~= "predicate" then
+            r = HasRestriction(d)
+            if not r then EachField(d, function(f) r = r or HasRestriction(f) end) end
+        end
+        e.restricted = r
+    end
+    return e.restricted
+end
+
+-- Type names and field names an entry mentions, built the first time a
+-- type: or field: search needs them.
+local function Deep(e)
+    if not e.deepTypes then
+        local types, fields = { "|" }, { "|" }
+        EachField(e.doc, function(f)
+            for _, t in ipairs({ f.Type or false, f.InnerType or false, f.KeyType or false, f.Mixin or false }) do
+                if t then types[#types + 1] = lower(tostring(t)) .. "|" end
+            end
+            if f.Name then fields[#fields + 1] = lower(tostring(f.Name)) .. "|" end
+        end)
+        e.deepTypes, e.deepFields = table.concat(types), table.concat(fields)
+    end
+    return e
 end
 
 function Model.Groups()    Model.Build() return groups end
@@ -341,35 +454,71 @@ function Model.DocsError() return docsError end
 --------------------------------------------------------------------------------
 -- Search
 --
--- Plain, case-insensitive substring matching on the qualified name. Returns
--- the matching entries in model order, and the groups to show: every group
--- with a matching entry, plus every group whose own name matches, with how
--- many of its entries matched.
+-- Case-insensitive substring matching. The query matches qualified names,
+-- unless it starts with an operator:
+--
+--   type:AuraData     entries whose arguments, returns, payload or fields
+--                     use that type
+--   field:unitTarget  entries with an argument, return, payload value or
+--                     field of that name
+--
+-- filters (optional): { kind = "functions"|"events"|"types",
+--                       flag = "restricted"|"undocumented"|"missing" }
+--
+-- Returns nil when there is neither a query nor a filter. Otherwise the
+-- matching entries in model order, the groups to show (every group with a
+-- match, plus, for a plain name search without filters, every group whose
+-- own name matches -- those are in `whole` and show all their entries),
+-- per-group counts, and `pass`, the test itself.
 --------------------------------------------------------------------------------
 
-function Model.Search(query)
-    Model.Build()
-    local q = lower(strtrim(query or ""))
-    if q == "" then return nil end
+Model.KIND_FILTERS = {
+    functions = { ["function"] = true, method = true, global = true },
+    events    = { event = true },
+    types     = { enum = true, struct = true, constants = true, callback = true, table = true },
+}
 
-    local matched, counts = {}, {}
+function Model.Search(query, filters)
+    Model.Build()
+    local raw = strtrim(query or "")
+    local kinds = filters and Model.KIND_FILTERS[filters.kind]
+    local flag = filters and filters.flag
+    if raw == "" and not kinds and not flag then return nil end
+
+    local mode, q = "name", lower(raw)
+    local op, rest = q:match("^(%a+):%s*(.*)$")
+    if op == "type" or op == "field" then mode, q = op, rest end
+
+    local function Pass(e)
+        if kinds and not kinds[e.kind] then return false end
+        if flag == "restricted" then
+            if not Model.IsRestricted(e) then return false end
+        elseif flag and e.flag ~= flag then
+            return false
+        end
+        if q == "" then return true end
+        if mode == "type" then return Deep(e).deepTypes:find(q, 1, true) ~= nil end
+        if mode == "field" then return Deep(e).deepFields:find(q, 1, true) ~= nil end
+        return e.search:find(q, 1, true) ~= nil
+    end
+
+    local byName = mode == "name" and q ~= "" and not kinds and not flag
+    local matched, counts, shown, whole = {}, {}, {}, {}
     for _, g in ipairs(groups) do
         local n = 0
         for _, e in ipairs(g.entries) do
-            if e.search:find(q, 1, true) then
+            if Pass(e) then
                 matched[#matched + 1] = e
                 n = n + 1
             end
         end
         counts[g] = n
+        if byName and g.search:find(q, 1, true) then whole[g] = true end
+        if n > 0 or whole[g] then shown[#shown + 1] = g end
     end
 
-    local shown = {}
-    for _, g in ipairs(groups) do
-        if counts[g] > 0 or g.search:find(q, 1, true) then shown[#shown + 1] = g end
-    end
-
-    return { query = q, entries = matched, groups = shown, counts = counts }
+    return { query = q, raw = raw, mode = mode, entries = matched, groups = shown,
+             counts = counts, whole = whole, pass = Pass }
 end
 
 function Model.Describe()

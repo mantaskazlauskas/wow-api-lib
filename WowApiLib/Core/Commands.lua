@@ -15,6 +15,7 @@ local HELP = {
     "/wal clear               drop the export from saved variables",
     "/wal rescan              rescan the runtime (after other addons load more UI)",
     "/wal stats               counts",
+    "/wal inspect             pick a frame on screen and open its widget APIs",
     "/wal minimap             hide or show the minimap button",
 }
 
@@ -47,6 +48,8 @@ verbs.stats = function()
 end
 
 verbs.minimap = function() ns.ToggleMinimapButton() end
+
+verbs.inspect = function() ns.StartInspector() end
 
 verbs.help = function()
     for _, line in ipairs(HELP) do ns.Print(line) end

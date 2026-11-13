@@ -87,6 +87,10 @@ local function Methods(objType)
         end
     end
     function m:GetText() return self._text end
+    function m:GetName() return self._name end
+    function m:GetObjectType() return objType end
+    function m:IsObjectType(t) return t == objType or (t == "Frame" and objType == "Button") end
+    function m:GetSize() return self._w or 300, self._h or 400 end
     function m:SetSize(w, h) self._w, self._h = w, h end
     function m:SetWidth(w) self._w = w end
     function m:SetHeight(h) self._h = h end
@@ -123,7 +127,7 @@ function NewObject(objType, parent, name)
     local o = setmetatable({ _type = objType, _parent = parent, _scripts = {}, _events = {}, _shown = true },
                            { __index = Methods(objType) })
     FRAMES[#FRAMES + 1] = o
-    if name then _G[name] = o end
+    if name then o._name = name; _G[name] = o end
     return o
 end
 

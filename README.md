@@ -28,6 +28,7 @@ system is `SecureOnly` or belongs to another game flavour.
 | `/wal clear` | drop the export from saved variables |
 | `/wal rescan` | rescan the runtime, e.g. after other addons load more UI |
 | `/wal stats` | counts |
+| `/wal inspect` | pick a frame on screen and open its widget APIs |
 | `/wal minimap` | hide or show the minimap button |
 
 The browser also has a minimap button (left-drag moves it around the rim) and
@@ -38,6 +39,24 @@ such as EllesmereUI, pick the minimap button up there.
 In the browser, click a group to see it listed in full, or an entry to see its
 signature, types, documentation and flags. The detail pane is an edit box:
 **Select text**, then Ctrl+C, copies it.
+
+- **Search** matches names. `type:AuraData` finds everything whose arguments,
+  returns, payload or fields use that type; `field:unitTarget` finds everything
+  with an argument, return or field of that name.
+- **Filters** under the search box narrow it to functions, events or types, and
+  to restricted (a `Secret*` flag or a precondition such as `RequiresValidMap`),
+  undocumented or missing entries. They work with or without search text.
+  Restricted entries are tagged `R` in the list, and their flags are listed
+  under **Restrictions**, ahead of the arguments.
+- **Links** above the detail text go to the entry's group and to every type it
+  uses. **<** and **>** (or the mouse's back and forward buttons) walk back
+  through what you looked at.
+- **Favorite** on an entry adds it to a Favorites group at the top of the list.
+- **Inspect** (or `/wal inspect`) works like `/fstack`: hover a frame to see
+  what it is, press Shift to open it, Escape to stop. The browser shows its
+  size, anchors, parents and the scripts it has set, lists its widget type's
+  methods, and links to the widget API docs that apply to it. Only frames that
+  take the mouse can be picked, and it won't start in combat.
 
 Nothing loads at login. The documentation (a few megabytes of tables) and the
 runtime scan load the first time you open the browser or export.

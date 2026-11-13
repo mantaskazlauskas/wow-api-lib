@@ -260,6 +260,49 @@ function ui.Label(parent, template, colour)
     return Text(parent, template, colour)
 end
 
+-- A row of toggle buttons with one selected, e.g. a filter. Each option is
+-- { value = ..., label = ... }; values are compared with ==.
+--   row:SetValue(v)   select without calling onSelect
+function ui.Chips(parent, options, onSelect)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetHeight(20)
+    row.buttons = {}
+    local selBg = { C.accent[1], C.accent[2], C.accent[3], 0.28 }
+    local x = 0
+    for i, opt in ipairs(options) do
+        local b = CreateFrame("Button", nil, row, "BackdropTemplate")
+        Fill(b, C.control)
+        local fs = Text(b, "GameFontHighlightSmall")
+        fs:SetJustifyH("CENTER")
+        b:SetFontString(fs)
+        b:SetText(opt.label)
+        local w = max(36, floor((fs:GetStringWidth() or 40) + 16))
+        b:SetSize(w, 20)
+        b:SetPoint("LEFT", x, 0)
+        x = x + w + 3
+        b.value = opt.value
+        b:SetScript("OnClick", function()
+            row:SetValue(opt.value)
+            onSelect(opt.value)
+        end)
+        b:SetScript("OnEnter", function(self) if not self.on then self:SetBackdropColor(Unpack(C.hover)) end end)
+        b:SetScript("OnLeave", function(self) if not self.on then self:SetBackdropColor(Unpack(C.control)) end end)
+        row.buttons[i] = b
+    end
+    row:SetWidth(max(1, x - 3))
+
+    function row:SetValue(v)
+        self.value = v
+        for _, b in ipairs(self.buttons) do
+            b.on = b.value == v
+            b:SetBackdropColor(Unpack(b.on and selBg or C.control))
+            b:SetBackdropBorderColor(Unpack(b.on and C.accent or C.border))
+        end
+    end
+    row:SetValue(options[1] and options[1].value)
+    return row
+end
+
 --------------------------------------------------------------------------------
 -- Panel: a box with a header strip
 --
@@ -291,6 +334,16 @@ function ui.Panel(parent, title)
 
     function p:SetTitle(text) self.titleText:SetText(text and text:upper() or "") end
     function p:SetInfo(text) self.info:SetText(text or "") end
+
+    -- A small button at the right of the header; the info text moves left of it.
+    function p:AddHeaderButton(text, width, onClick)
+        local b = ui.Button(self, text, width, onClick)
+        b:SetHeight(16)
+        b:SetPoint("RIGHT", head, "RIGHT", -4, 0)
+        self.info:ClearAllPoints()
+        self.info:SetPoint("RIGHT", b, "LEFT", -8, 0)
+        return b
+    end
 
     p:SetTitle(title)
     return p
@@ -355,13 +408,14 @@ end
 --   opts.pip                    leave room for a coloured marker, row.pip
 --   opts.render(row, item)      set row.text / row.tag (/ row.pip)
 --   opts.onClick(item)
+--   opts.onMouseNav(row, button)  the mouse's back/forward buttons on a row
 --   opts.isSelected(item)       -> bool
 --------------------------------------------------------------------------------
 
 local function CreateRow(list)
     local row = CreateFrame("Button", nil, list)
     row:SetHeight(ui.ROW_H)
-    row:RegisterForClicks("LeftButtonUp")
+    row:RegisterForClicks("LeftButtonUp", "Button4Up", "Button5Up")
 
     row.stripe = Solid(row, "BACKGROUND", { 1, 1, 1, 0.018 })
     row.stripe:SetAllPoints()
@@ -396,8 +450,12 @@ local function CreateRow(list)
     row.text:SetPoint("RIGHT", row.tag, "LEFT", -8, 0)
     row.text:SetWordWrap(false)
 
-    row:SetScript("OnClick", function(self)
-        if self.item and list.opts.onClick then list.opts.onClick(self.item) end
+    row:SetScript("OnClick", function(self, button)
+        if button == "Button4" or button == "Button5" then
+            if list.opts.onMouseNav then list.opts.onMouseNav(self, button) end
+        elseif self.item and list.opts.onClick then
+            list.opts.onClick(self.item)
+        end
     end)
     return row
 end
@@ -480,19 +538,81 @@ end
 -- copied with Ctrl+C. Typing is undone as it happens.
 --
 --   holder:SetEmptyText(text)   shown, centred, while there is no content
+--   holder:SetLinks(links)      buttons above the text, each { label, onClick },
+--                               wrapped onto at most LINK_ROWS rows; {} clears
 --------------------------------------------------------------------------------
+
+local LINK_H, LINK_GAP, LINK_ROWS = 18, 4, 3
 
 function ui.TextView(parent, title)
     local holder = ui.Panel(parent, title)
-    local top = ui.HEADER_H + 6
+
+    -- Zero height while there are no links, so the text starts at the top.
+    local linkArea = CreateFrame("Frame", nil, holder)
+    linkArea:SetPoint("TOPLEFT", 8, -(ui.HEADER_H + 5))
+    linkArea:SetPoint("RIGHT", -14, 0)
+    linkArea:SetHeight(0)
 
     local sf = CreateFrame("ScrollFrame", nil, holder)
-    sf:SetPoint("TOPLEFT", 8, -top)
+    sf:SetPoint("TOPLEFT", linkArea, "BOTTOMLEFT", 0, -1)
     sf:SetPoint("BOTTOMRIGHT", -14, 6)
 
     local bar = Scrollbar(holder, function(v) sf:SetVerticalScroll(v) end)
     bar:SetPoint("TOPRIGHT", -3, -ui.HEADER_H - 3)
     bar:SetPoint("BOTTOMRIGHT", -3, 3)
+
+    local pool, links = {}, {}
+
+    local function LinkButton(i)
+        local b = pool[i]
+        if b then return b end
+        b = CreateFrame("Button", nil, linkArea, "BackdropTemplate")
+        Fill(b, C.control)
+        b:SetHeight(LINK_H)
+        local fs = Text(b, "GameFontHighlightSmall", C.accentHi)
+        fs:SetJustifyH("CENTER")
+        b:SetFontString(fs)
+        b:SetScript("OnEnter", function(self) self:SetBackdropColor(Unpack(C.hover)) end)
+        b:SetScript("OnLeave", function(self) self:SetBackdropColor(Unpack(C.control)) end)
+        b:SetScript("OnClick", function(self) if self.onClick then self.onClick() end end)
+        pool[i] = b
+        return b
+    end
+
+    local function LayoutLinks()
+        local width = linkArea:GetWidth() or 0
+        if width <= 0 then width = 300 end
+        local x, row = 0, 0
+        for i, b in ipairs(pool) do
+            if i <= #links and row < LINK_ROWS then
+                if x > 0 and x + b.w > width then row, x = row + 1, 0 end
+            end
+            if i <= #links and row < LINK_ROWS then
+                b:ClearAllPoints()
+                b:SetPoint("TOPLEFT", x, -row * (LINK_H + LINK_GAP))
+                b:Show()
+                x = x + b.w + LINK_GAP
+            else
+                b:Hide()
+            end
+        end
+        local rows = #links > 0 and min(row + 1, LINK_ROWS) or 0
+        linkArea:SetHeight(rows > 0 and rows * (LINK_H + LINK_GAP) or 0)
+    end
+    linkArea:SetScript("OnSizeChanged", LayoutLinks)
+
+    function holder:SetLinks(list)
+        links = list or {}
+        for i, l in ipairs(links) do
+            local b = LinkButton(i)
+            b:SetText(l.label)
+            b.onClick = l.onClick
+            b.w = floor((b:GetFontString() and b:GetFontString():GetStringWidth() or 60) + 14)
+            b:SetWidth(b.w)
+        end
+        LayoutLinks()
+    end
+    holder.links = pool
 
     local function ScrollTo(v)
         local range = sf:GetVerticalScrollRange() or 0

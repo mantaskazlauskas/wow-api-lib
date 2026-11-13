@@ -300,6 +300,137 @@ Slash("search ")
 ok(DetailText() ~= nil, "clearing the search does not error")
 
 --------------------------------------------------------------------------------
+section("search filters and type search")
+--------------------------------------------------------------------------------
+
+local function Fulls(r)
+    local set = {}
+    for _, e in ipairs(r and r.entries or {}) do set[e.full] = e end
+    return set
+end
+
+eq(Model.Search("", {}), nil, "no query and no filter is no search")
+if not REAL then
+    local r = Fulls(Model.Search("type:UIMapType"))
+    ok(r.UiMapDetails ~= nil, "type: finds a structure with a field of that type")
+    ok(r["C_Map.GetBestMapForUnit"] == nil, "type: does not match by name")
+    r = Fulls(Model.Search("field:unitToken"))
+    ok(r["C_Map.GetBestMapForUnit"] ~= nil, "field: finds a function by argument name")
+
+    local evs = Model.Search("", { kind = "events" })
+    local allEvents = true
+    for _, e in ipairs(evs.entries) do allEvents = allEvents and e.kind == "event" end
+    ok(#evs.entries > 0 and allEvents, "the events filter keeps only events")
+    ok(Fulls(Model.Search("map", { kind = "events" })).MAP_EXPLORATION_UPDATED ~= nil, "filter and query combine")
+
+    r = Fulls(Model.Search("", { flag = "restricted" }))
+    ok(r["C_Map.GetBestMapForUnit"] ~= nil, "restricted: a Secret* flag counts")
+    ok(r["C_Map.GoneInThisClient"] ~= nil, "restricted: a declared predicate counts")
+    ok(r.MAP_EXPLORATION_UPDATED ~= nil, "restricted: a field-level ConditionalSecret counts")
+    ok(r["Enum.UIMapType"] == nil, "restricted: an enum is not")
+    r = Fulls(Model.Search("", { flag = "missing" }))
+    ok(r["C_Map.GoneInThisClient"] ~= nil and r["C_Map.GetBestMapForUnit"] == nil, "missing filter")
+
+    local details = FindEntry(FindGroup("C_Map"), "UiMapDetails")
+    local related = details and Model.RelatedTypes(details) or {}
+    ok(related[1] and related[1].full == "Enum.UIMapType", "related types resolve to their definitions")
+    Has(Format.Entry(FindEntry(FindGroup("C_Map"), "C_Map.GetBestMapForUnit")), "Restrictions\n  SecretArguments",
+        "restriction flags get their own section")
+end
+
+--------------------------------------------------------------------------------
+section("browsing: links, history, favorites, filters")
+--------------------------------------------------------------------------------
+
+-- Visible buttons by their text (links, chips, toolbar buttons).
+local function ButtonText(text)
+    for _, f in ipairs(FRAMES) do
+        if f._type == "Button" and f._text == text and f._shown ~= false and f._scripts.OnClick then return f end
+    end
+end
+local function Click(b) if b then b._scripts.OnClick(b, "LeftButton") end return b ~= nil end
+
+if not REAL then
+    Slash("search GetBestMapForUnit")
+    for _, row in ipairs(Rows()) do
+        if row.item.full == "C_Map.GetBestMapForUnit" then row._scripts.OnClick(row) end
+    end
+    Has(DetailText(), "C_Map.GetBestMapForUnit(unitToken)", "an entry is shown")
+
+    ok(Click(ButtonText("in C_Map")), "the detail has a link to the entry's group")
+    Has(DetailText(), "C_Map  (MapUI)", "following it shows the group")
+    ok(Click(ButtonText("<")), "there is a back button")
+    Has(DetailText(), "local uiMapID = C_Map.GetBestMapForUnit", "back returns to the entry")
+    Click(ButtonText(">"))
+    Has(DetailText(), "C_Map  (MapUI)", "forward goes to the group again")
+    Click(ButtonText("<"))
+
+    ok(Click(ButtonText("Favorite")), "an entry can be favorited")
+    ok(DB.favorites and DB.favorites["function|C_Map.GetBestMapForUnit"] == true, "favorites are saved by key")
+    Slash("search ")
+    local favRow
+    for _, row in ipairs(Rows()) do
+        if row.item.label == "Favorites" then favRow = row end
+    end
+    ok(favRow ~= nil, "a Favorites group is listed")
+    if favRow then
+        favRow._scripts.OnClick(favRow)
+        Has(DetailText(), "C_Map.GetBestMapForUnit(unitToken)", "it lists the favorite")
+        for _, row in ipairs(Rows()) do
+            if row.item.full == "C_Map.GetBestMapForUnit" then row._scripts.OnClick(row) end
+        end
+        ok(Click(ButtonText("Unfavorite")), "a favorite can be removed")
+        ok(DB.favorites["function|C_Map.GetBestMapForUnit"] == nil, "and is dropped from saved variables")
+        local still = false
+        for _, row in ipairs(Rows()) do
+            if row.item.label == "Favorites" then still = true end
+        end
+        ok(not still, "the Favorites group goes once it is empty")
+    end
+
+    Slash("search UiMapDetails")
+    for _, row in ipairs(Rows()) do
+        if row.item.full == "UiMapDetails" then row._scripts.OnClick(row) end
+    end
+    ok(Click(ButtonText("Enum.UIMapType")), "a type used by the entry is a link")
+    Has(DetailText(), "Continent = 2", "following it shows the type")
+    Click(ButtonText("<"))
+    Has(DetailText(), "UiMapDetails", "back returns to the entry")
+    Click(ButtonText("<"))
+    -- The search kept C_Map selected, so its step is C_Map narrowed to the match.
+    Has(DetailText(), "Structures (1)", "and back again to the search results")
+
+    Slash("search ")
+    ok(Click(ButtonText("Events")), "there is an Events filter")
+    local onlyEvents, n = true, 0
+    for _, row in ipairs(Rows()) do
+        if row.item.kind then n = n + 1; onlyEvents = onlyEvents and row.item.kind == "event" end
+    end
+    ok(n > 0 and onlyEvents, "the Events filter lists only events")
+    Click(ButtonText("All"))
+end
+
+--------------------------------------------------------------------------------
+section("frame inspector")
+--------------------------------------------------------------------------------
+
+local probe = CreateFrame("Button", "WalProbeButton", UIParent)
+probe:SetSize(120, 30)
+NS.InspectFrame(probe)
+Has(DetailText(), "WalProbeButton  (Button)", "an inspected frame is shown")
+Has(DetailText(), "Size         120 x 30", "with its size")
+if not REAL then
+    Has(DetailText(), "Is a         Frame", "with the documented widget types it is")
+    ok(ButtonText("SimpleFrameAPI") ~= nil, "linked to its widget API docs")
+end
+ok(Click(ButtonText("<")), "back leaves the inspected frame")
+
+NS.StartInspector()
+ok(NS.IsInspecting(), "the inspector starts")
+NS.StopInspector(true)
+ok(not NS.IsInspecting() and WowApiLibBrowser:IsShown(), "stopping it brings the browser back")
+
+--------------------------------------------------------------------------------
 section("export")
 --------------------------------------------------------------------------------
 

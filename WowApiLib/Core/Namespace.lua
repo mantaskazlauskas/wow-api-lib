@@ -47,6 +47,11 @@ end)
 function ns.ShowBrowser(_) end
 function ns.ToggleBrowser() end
 function ns.RefreshBrowser() end
+function ns.HideBrowser() end
+function ns.InspectFrame(_) end
+
+-- UI/Inspector.lua
+function ns.StartInspector() end
 
 -- UI/Launchers.lua
 function ns.SetupLaunchers() end

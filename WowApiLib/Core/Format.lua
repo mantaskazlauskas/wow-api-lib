@@ -68,11 +68,12 @@ local FIELD_LAID_OUT = {
     Mixin = true, EnumValue = true,
 }
 
-local function Flags(doc, out, indent, skip)
+-- want (optional): only the keys it returns true for.
+local function Flags(doc, out, indent, skip, want)
     local keys = {}
     for k in pairs(doc) do
         if type(k) == "string" and not LAID_OUT[k] and not (skip and skip[k]) and not BACKREFS[k]
-           and k:find("^%u") and type(doc[k]) ~= "function" then
+           and k:find("^%u") and type(doc[k]) ~= "function" and (not want or want(k)) then
             keys[#keys + 1] = k
         end
     end
@@ -86,6 +87,9 @@ local function Documentation(doc, out, indent)
     if type(doc.Documentation) ~= "table" then return end
     for _, line in ipairs(doc.Documentation) do out[#out + 1] = (indent or "") .. line end
 end
+
+local function IsRestriction(k) return ns.Model.IsRestrictionKey(k) end
+local function IsOther(k) return not ns.Model.IsRestrictionKey(k) end
 
 local function IsOptional(f) return f.Nilable or f.Default ~= nil end
 
@@ -225,6 +229,15 @@ function Format.Entry(e)
             Documentation(d, out)
         end
 
+        -- Restrictions first: they decide whether the call is usable at all.
+        local restrictions = {}
+        Flags(d, restrictions, "  ", nil, IsRestriction)
+        if #restrictions > 0 then
+            out[#out + 1] = ""
+            out[#out + 1] = "Restrictions"
+            for _, l in ipairs(restrictions) do out[#out + 1] = l end
+        end
+
         local body = {}
         if e.kind == "function" or e.kind == "method" or e.kind == "global" then
             FieldLines(d.Arguments, body, "Arguments")
@@ -240,7 +253,7 @@ function Format.Entry(e)
         end
 
         local flags = {}
-        Flags(d, flags, "  ")
+        Flags(d, flags, "  ", nil, IsOther)
         if #flags > 0 then
             out[#out + 1] = ""
             out[#out + 1] = "Flags"
@@ -305,5 +318,44 @@ function Format.Group(g, list)
         out[#out + 1] = format("... %d more. /wal export writes all of it to disk.", #list - lines)
     end
 
+    return concat(out, "\n")
+end
+
+--------------------------------------------------------------------------------
+-- An inspected frame (UI/Inspector.lua builds `info`)
+--------------------------------------------------------------------------------
+
+function Format.Frame(info)
+    local out = {}
+    out[#out + 1] = format("%s  (%s)", info.name, info.objectType or "?")
+    if info.forbidden then
+        out[#out + 1] = ""
+        out[#out + 1] = "Forbidden: Blizzard code owns this frame and addons cannot read or touch it."
+        return concat(out, "\n")
+    end
+    out[#out + 1] = ""
+    for _, row in ipairs(info.rows or {}) do
+        out[#out + 1] = format("%-12s %s", row[1], row[2])
+    end
+    if info.types and #info.types > 0 then
+        out[#out + 1] = "Is a         " .. concat(info.types, ", ")
+    end
+    if info.parents and #info.parents > 0 then
+        out[#out + 1] = ""
+        out[#out + 1] = "Parents"
+        for _, p in ipairs(info.parents) do out[#out + 1] = "  " .. p end
+    end
+    if info.points and #info.points > 0 then
+        out[#out + 1] = ""
+        out[#out + 1] = "Anchors"
+        for _, p in ipairs(info.points) do out[#out + 1] = "  " .. p end
+    end
+    if info.scripts and #info.scripts > 0 then
+        out[#out + 1] = ""
+        out[#out + 1] = "Scripts set"
+        out[#out + 1] = "  " .. concat(info.scripts, ", ")
+    end
+    out[#out + 1] = ""
+    out[#out + 1] = "The links above go to the widget APIs this frame has; the entry list shows its methods."
     return concat(out, "\n")
 end
